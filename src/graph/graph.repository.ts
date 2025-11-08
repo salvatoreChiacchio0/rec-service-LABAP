@@ -363,6 +363,51 @@ export class GraphRepository {
     return this.getRecentlyCreatedUsers(userUid, limit);
   }
 
+  async getFallbackRecommendations(
+    userUid: string,
+    limit: number = 10,
+    excludeUids: string[] = [],
+  ): Promise<any[]> {
+    if (limit <= 0) {
+      return [];
+    }
+
+    const excludeSet = new Set<string>([userUid, ...excludeUids.filter(Boolean)]);
+    const uniqueResults: any[] = [];
+
+    const addUnique = (items: any[]) => {
+      for (const item of items) {
+        const recommendedUid = item?.recommendedUserUid;
+        if (!recommendedUid || excludeSet.has(recommendedUid)) {
+          continue;
+        }
+        uniqueResults.push(item);
+        excludeSet.add(recommendedUid);
+        if (uniqueResults.length >= limit) {
+          break;
+        }
+      }
+    };
+
+    if (uniqueResults.length < limit) {
+      const popular = await this.getMostPopularUsers(
+        userUid,
+        limit + excludeSet.size,
+      );
+      addUnique(popular);
+    }
+
+    if (uniqueResults.length < limit) {
+      const recent = await this.getRecentlyCreatedUsers(
+        userUid,
+        limit + excludeSet.size,
+      );
+      addUnique(recent);
+    }
+
+    return uniqueResults.slice(0, limit);
+  }
+
   // Get graph statistics
   async getGraphStatistics(): Promise<any> {
     const statsQuery = `

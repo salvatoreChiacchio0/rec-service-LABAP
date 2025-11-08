@@ -8,6 +8,12 @@ import { CloudEventInterceptor } from './kafka/interceptors/cloud-event.intercep
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.enableCors({
+    origin: ['http://localhost:3000', 'http://localhost:3002'],
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    credentials: true,
+  });
+
   // Swagger configuration
   const config = new DocumentBuilder()
     .setTitle('Recommendation Service API')
@@ -26,7 +32,6 @@ async function bootstrap() {
     customSiteTitle: 'Recommendation Service API',
     customCss: '.swagger-ui .topbar { display: none }',
   });
-
   // Connect Kafka microservice
   const microservice = app.connectMicroservice<MicroserviceOptions>(kafkaConfig);
   
@@ -47,5 +52,6 @@ async function bootstrap() {
   console.log('  - FeedbackEvent');
   console.log('  - SwapProposalEvent');
   console.log('===========================================');
+  console.log("STARTED")
 }
 bootstrap();

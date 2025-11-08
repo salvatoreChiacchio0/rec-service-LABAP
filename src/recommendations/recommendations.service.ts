@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { GraphRepository } from '../graph/graph.repository';
 import {
   HttpClientService,
@@ -38,7 +38,7 @@ export interface UserRecommendation {
 }
 
 @Injectable()
-export class RecommendationsService {
+export class RecommendationsService implements OnModuleInit {
   private readonly logger = new Logger(RecommendationsService.name);
   private graphSeeding = false;
 
@@ -46,6 +46,20 @@ export class RecommendationsService {
     private readonly graphRepository: GraphRepository,
     private readonly httpClient: HttpClientService,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    this.logger.log('Initializing recommendation graph from backend data...');
+    try {
+      const seeded = await this.seedGraphFromBackend();
+      if (seeded) {
+        this.logger.log('Initial graph seeding completed successfully.');
+      } else {
+        this.logger.log('Graph seeding skipped or no data available.');
+      }
+    } catch (error) {
+      this.logger.error('Failed during initial graph seeding', error);
+    }
+  }
 
   async getSwapRecommendations(
     userUid: string,
@@ -56,20 +70,40 @@ export class RecommendationsService {
     );
 
     // Step 1: Graph traversal di livello 2
-    let recommendationType: 'level2' | 'fallback' = 'level2';
-    let graphResults =
-      await this.graphRepository.getLevel2SwapRecommendations(userUid, limit);
+    type RecommendationOrigin = 'level2' | 'fallback';
+    let graphResults = (
+      await this.graphRepository.getLevel2SwapRecommendations(userUid, limit)
+    ).map((result) => ({
+      ...result,
+      origin: 'level2' as RecommendationOrigin,
+    }));
 
-    if (graphResults.length === 0) {
-      this.logger.warn(
-        `No level 2 recommendations found for user ${userUid}, trying fallback strategy`,
-      );
-      // Fallback chain
-      graphResults = await this.graphRepository.getSwapRecommendationsWithFallback(
+    if (graphResults.length < limit) {
+      if (graphResults.length > 0) {
+        this.logger.warn(
+          `Level 2 recommendations for user ${userUid} returned only ${graphResults.length} results. Fetching fallback recommendations to complete list.`,
+        );
+      } else {
+        this.logger.warn(
+          `No level 2 recommendations found for user ${userUid}, trying fallback strategy`,
+        );
+      }
+
+      const fallbackNeeded = limit - graphResults.length;
+      const fallbackResults = await this.graphRepository.getFallbackRecommendations(
         userUid,
-        limit,
+        fallbackNeeded,
+        graphResults.map((result) => result.recommendedUserUid),
       );
-      recommendationType = 'fallback';
+
+      if (fallbackResults.length > 0) {
+        graphResults = graphResults.concat(
+          fallbackResults.map((result) => ({
+            ...result,
+            origin: 'fallback' as RecommendationOrigin,
+          })),
+        );
+      }
     }
 
     if (graphResults.length === 0) {
@@ -78,12 +112,15 @@ export class RecommendationsService {
         this.logger.log(
           `Graph seeded from backend data. Recomputing recommendations for user ${userUid}`,
         );
-        graphResults =
-          await this.graphRepository.getSwapRecommendationsWithFallback(
+        graphResults = (
+          await this.graphRepository.getFallbackRecommendations(
             userUid,
             limit,
-          );
-        recommendationType = 'fallback';
+          )
+        ).map((result) => ({
+          ...result,
+          origin: 'fallback' as RecommendationOrigin,
+        }));
       }
     }
 
@@ -95,12 +132,13 @@ export class RecommendationsService {
     }
 
     // Step 2: Arricchisci con dati utenti dal backend
-    return this.enrichWithUserData(graphResults, recommendationType);
+    return this.enrichWithUserData(graphResults);
   }
 
   private async enrichWithUserData(
-    graphResults: any[],
-    recommendationType: 'level2' | 'fallback',
+    graphResults: Array<
+      any & { origin?: 'level2' | 'fallback'; recommendedUserUid: string }
+    >,
   ): Promise<UserRecommendation[]> {
     const userUids = graphResults.map((r) => r.recommendedUserUid);
 
@@ -126,7 +164,7 @@ export class RecommendationsService {
         ]);
 
         const reason =
-          recommendationType === 'level2'
+          result.origin === 'level2'
             ? `Consigliato perché ha fatto swap con utenti con cui anche tu hai swappato`
             : `Consigliato in base alle skill disponibili e alla popolarità degli utenti`;
 

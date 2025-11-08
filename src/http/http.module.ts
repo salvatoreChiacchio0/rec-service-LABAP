@@ -5,7 +5,6 @@ import { HttpClientService } from './http-client.service';
 @Module({
   imports: [
     NestHttpModule.register({
-      timeout: 5000,
       maxRedirects: 5,
     }),
   ],
