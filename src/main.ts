@@ -1,12 +1,16 @@
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions } from '@nestjs/microservices';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
-import { kafkaConfig } from './kafka/kafka.config';
+import { createKafkaConfig } from './kafka/kafka.config';
 import { CloudEventInterceptor } from './kafka/interceptors/cloud-event.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Get ConfigService instance
+  const configService = app.get(ConfigService);
 
   app.enableCors({
     origin: ['http://localhost:3000', 'http://localhost:3002'],
@@ -32,7 +36,9 @@ async function bootstrap() {
     customSiteTitle: 'Recommendation Service API',
     customCss: '.swagger-ui .topbar { display: none }',
   });
-  // Connect Kafka microservice
+  
+  // Connect Kafka microservice using ConfigService
+  const kafkaConfig = createKafkaConfig(configService);
   const microservice = app.connectMicroservice<MicroserviceOptions>(kafkaConfig);
   
   // Register global interceptor for CloudEvent processing
@@ -40,7 +46,7 @@ async function bootstrap() {
 
   await app.startAllMicroservices();
   
-  const port = process.env.PORT ?? 3002;
+  const port = configService.get<number>('PORT', 3002);
   await app.listen(port);
   
   console.log('===========================================');

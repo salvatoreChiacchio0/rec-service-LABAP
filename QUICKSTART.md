@@ -34,7 +34,7 @@ curl http://localhost:3002
 
 ```bash
 # 1. Crea file .env (se non esiste)
-Copy-Item env.example .env
+Copy-Item .env .env
 
 # 2. Avvia in modalità watch
 npm run start:dev

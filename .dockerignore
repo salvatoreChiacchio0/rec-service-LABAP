@@ -12,7 +12,6 @@ README.md
 *.log
 .env.*
 .env.example
-env.example
 docker-compose*.yml
 Dockerfile
 .dockerignore

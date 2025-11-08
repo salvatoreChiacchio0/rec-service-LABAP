@@ -37,10 +37,10 @@ Per sviluppare con l'applicazione in locale usando Neo4j e Kafka esistenti.
 ```bash
 # 1. Crea file .env
 # Su Windows PowerShell:
-Copy-Item env.example .env
+Copy-Item .env .env
 
 # Su Linux/Mac:
-cp env.example .env
+cp .env .env
 
 # 2. Installa dipendenze
 npm install

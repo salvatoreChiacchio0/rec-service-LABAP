@@ -96,12 +96,12 @@ Il rec-service si connetterà automaticamente a Neo4j e Kafka già in esecuzione
 # Installa dipendenze
 npm install
 
-# Crea file .env da env.example
+# Crea file .env da .env
 # Windows PowerShell:
-Copy-Item env.example .env
+Copy-Item .env .env
 
 # Linux/Mac:
-cp env.example .env
+cp .env .env
 
 # Avvia in modalità sviluppo
 npm run start:dev
